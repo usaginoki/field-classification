@@ -16,11 +16,14 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 from sklearn.model_selection import train_test_split
 
 from src.classification import get_enabled_classifiers
+from src.clip_extraction import CLIPFeatureExtractor
 from src.config import load_config
 from src.dataset import ImageDataset
 from src.evaluation import CrossValidator, HyperparameterSearcher, format_params
 from src.feature_extraction import FeatureCache, Qwen3VLFeatureExtractor
 from src.logging_config import setup_logging, get_logger
+from src.remote_clip_extraction import RemoteCLIPFeatureExtractor
+from src.siglip2_extraction import SigLIP2FeatureExtractor
 from src.vision_encoder_extraction import VisionEncoderFeatureExtractor
 
 
@@ -100,8 +103,19 @@ def main():
 
     # Initialize cache (include extraction_mode in cache key)
     cache = FeatureCache(config.data.cache_dir)
+
+    # Use model-specific name for cache key
+    if config.model.extraction_mode == "clip":
+        cache_model_name = config.model.clip_model
+    elif config.model.extraction_mode == "remote_clip":
+        cache_model_name = f"RemoteCLIP-{config.model.remote_clip_variant}"
+    elif config.model.extraction_mode == "siglip2":
+        cache_model_name = config.model.siglip2_model
+    else:
+        cache_model_name = config.model.name
+
     cache_key = cache.get_cache_key(
-        config.model.name,
+        cache_model_name,
         config.model.pooling,
         f"{dataset_name}_{config.model.extraction_mode}",
     )
@@ -112,8 +126,15 @@ def main():
         features, labels, filenames, metadata = cache.load(cache_key)
         console.print(f"  Loaded {len(labels)} samples with {features.shape[1]} features")
     else:
-        mode_desc = "vision encoder" if config.model.extraction_mode == "vision_encoder" else "full model"
-        console.print(f"\n[yellow]Extracting features with {config.model.name} ({mode_desc})...[/yellow]")
+        mode_descriptions = {
+            "vision_encoder": f"{config.model.name} (vision encoder)",
+            "full": f"{config.model.name} (full model)",
+            "clip": f"CLIP ({config.model.clip_model})",
+            "remote_clip": f"RemoteCLIP ({config.model.remote_clip_variant})",
+            "siglip2": f"SigLIP2 ({config.model.siglip2_model})",
+        }
+        mode_desc = mode_descriptions.get(config.model.extraction_mode, config.model.extraction_mode)
+        console.print(f"\n[yellow]Extracting features with {mode_desc}...[/yellow]")
 
         # Load dataset
         dataset = ImageDataset(data_root)
@@ -130,7 +151,25 @@ def main():
                 dtype=config.model.dtype,
                 pooling=config.model.pooling,
             )
-        else:
+        elif config.model.extraction_mode == "clip":
+            extractor = CLIPFeatureExtractor(
+                model_name=config.model.clip_model,
+                device=config.model.device,
+                dtype=config.model.dtype,
+            )
+        elif config.model.extraction_mode == "remote_clip":
+            extractor = RemoteCLIPFeatureExtractor(
+                variant=config.model.remote_clip_variant,
+                device=config.model.device,
+                dtype=config.model.dtype,
+            )
+        elif config.model.extraction_mode == "siglip2":
+            extractor = SigLIP2FeatureExtractor(
+                model_name=config.model.siglip2_model,
+                device=config.model.device,
+                dtype=config.model.dtype,
+            )
+        else:  # "full" mode
             extractor = Qwen3VLFeatureExtractor(
                 model_name=config.model.name,
                 device=config.model.device,
@@ -141,7 +180,7 @@ def main():
 
         # Cache features
         metadata = {
-            "model": config.model.name,
+            "model": cache_model_name,
             "extraction_mode": config.model.extraction_mode,
             "pooling": config.model.pooling,
             "dataset": dataset_name,

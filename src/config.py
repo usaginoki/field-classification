@@ -15,7 +15,10 @@ class ModelConfig:
     pooling: str = "mean"
     dtype: str = "float16"
     device: str = "cuda"
-    extraction_mode: str = "vision_encoder"  # "full" or "vision_encoder"
+    extraction_mode: str = "vision_encoder"  # "full", "vision_encoder", "clip", "remote_clip", "siglip2"
+    clip_model: str = "openai/clip-vit-base-patch32"  # CLIP model name (for extraction_mode="clip")
+    remote_clip_variant: str = "ViT-L-14"  # RemoteCLIP variant: RN50, ViT-B-32, ViT-L-14
+    siglip2_model: str = "google/siglip2-base-patch16-224"  # SigLIP2 model (for extraction_mode="siglip2")
 
 
 @dataclass
