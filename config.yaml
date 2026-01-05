@@ -1,0 +1,80 @@
+# Qwen3VL Image Classification Pipeline Configuration
+
+model:
+  # Model name from HuggingFace (Qwen/Qwen3-VL-4B-Instruct, Qwen/Qwen3-VL-8B-Instruct, etc.)
+  name: "Qwen/Qwen3-VL-8B-Instruct"
+  # Pooling strategy for visual features: mean, max, or cls
+  pooling: "mean"
+  # Data type for model weights: float16 or bfloat16
+  dtype: "float16"
+  # Device: cuda or cpu
+  device: "cuda"
+  # Feature extraction mode:
+  #   - "full": Use full model (vision encoder + LLM), features are LLM hidden states for visual tokens
+  #   - "vision_encoder": Use vision encoder only (faster, raw visual features)
+  extraction_mode: "vision_encoder"
+
+data:
+  # Root directory containing class_0, class_1, and sample folders
+  root: "data"
+  # Use sample dataset for testing (data/sample/)
+  use_sample: false
+  # Directory for cached features
+  cache_dir: "cache/features"
+  # Directory for output results (models, metrics, etc.)
+  output_dir: "output"
+
+training:
+  # Scoring metric for hyperparameter search: f1, accuracy, roc_auc
+  scoring_metric: "f1"
+  # Number of CV folds for hyperparameter search
+  hp_search_cv_folds: 3
+  # Number of CV folds for final evaluation
+  final_cv_folds: 5
+  # Random seed for reproducibility
+  random_seed: 42
+  # Fraction of data to hold out for final testing (used with --holdout flag)
+  holdout_fraction: 0.2
+
+classifiers:
+  mlp:
+    enabled: true
+    # Hidden layer configurations to try
+    hidden_layer_sizes:
+      - [128]
+      - [256]
+      - [128, 64]
+      - [256, 128]
+    # L2 regularization values
+    alpha: [0.0001, 0.001, 0.01]
+    # Initial learning rates
+    learning_rate_init: [0.001, 0.0001]
+    # Activation functions
+    activation: ["relu", "tanh"]
+
+  svm:
+    enabled: true
+    # Regularization parameter
+    C: [0.1, 1.0, 10.0, 100.0]
+    # Kernel coefficient
+    gamma: ["scale", "auto", 0.001, 0.01]
+    # Kernel types
+    kernel: ["rbf", "linear"]
+
+  xgboost:
+    enabled: true
+    # Number of boosting rounds
+    n_estimators: [100, 200, 300]
+    # Maximum tree depth
+    max_depth: [3, 5, 7]
+    # Boosting learning rate
+    learning_rate: [0.01, 0.1, 0.3]
+    # Subsample ratio of training instances
+    subsample: [0.8, 1.0]
+
+  logistic_regression:
+    enabled: true
+    # Inverse regularization strength
+    C: [0.01, 0.1, 1.0, 10.0]
+    # Optimization algorithm
+    solver: ["lbfgs"]
